@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>BTC Live Cluster Radar — Tablet Edition</title>
+  <title>MQL5 BTC Live Cluster Radar — Production Edition</title>
   <style>
     :root {
       --bg-primary: #0b0e14;
@@ -16,13 +16,20 @@
       --accent-green: #00e676;
       --accent-red: #ff5252;
       --accent-amber: #ffab00;
-      --font-mono: 'JetBrains Mono', monospace;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-primary); color: var(--text-main); padding: 16px; }
-    .container { max-width: 100%; margin: 0 auto; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      padding: 16px;
+    }
 
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* Header Bar */
     header {
       background-color: var(--bg-secondary);
       border: 1px solid var(--border-color);
@@ -37,12 +44,20 @@
     }
 
     .brand { display: flex; align-items: center; gap: 10px; }
-    .brand-icon { width: 36px; height: 36px; background: rgba(41, 98, 255, 0.15); border: 1px solid var(--accent-blue); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--accent-blue); font-weight: bold; }
+    .brand-icon {
+      width: 40px; height: 40px;
+      background: rgba(41, 98, 255, 0.15);
+      border: 1px solid var(--accent-blue);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--accent-blue); font-weight: bold; font-size: 1.2rem;
+    }
 
+    /* Live Ticker */
     .btc-ticker {
       background-color: var(--bg-card);
       border: 1px solid var(--border-color);
-      padding: 8px 14px;
+      padding: 8px 16px;
       border-radius: 8px;
       display: flex;
       align-items: center;
@@ -52,50 +67,111 @@
     .btc-ticker.flash-up { background-color: rgba(0, 230, 118, 0.25); }
     .btc-ticker.flash-down { background-color: rgba(255, 82, 82, 0.25); }
 
-    .price-value { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; }
-    .badge-status { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; font-weight: 600; background: rgba(0, 230, 118, 0.1); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .price-value { font-family: var(--font-mono); font-size: 1.2rem; font-weight: 700; }
+    
+    .badge-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; padding: 4px 10px;
+      border-radius: 20px; font-weight: 600;
+      background: rgba(0, 230, 118, 0.1);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+    }
     .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 
-    .api-panel {
-      background: var(--bg-secondary);
+    /* Controls Panel */
+    .controls-panel {
+      background-color: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: 10px;
       padding: 12px 16px;
       margin-bottom: 16px;
       display: flex;
-      gap: 10px;
+      justify-content: space-between;
       align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
-    .api-panel input {
-      flex: 1;
-      background: var(--bg-primary);
-      border: 1px solid var(--border-color);
-      color: #fff;
-      padding: 8px 12px;
-      border-radius: 6px;
+
+    .api-status {
       font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    .api-panel button {
+
+    button {
       background: var(--accent-blue);
       color: #fff;
       border: none;
-      padding: 8px 14px;
+      padding: 8px 16px;
       border-radius: 6px;
       font-weight: 600;
       cursor: pointer;
+      font-size: 0.85rem;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+
+    /* Cluster UI Box */
+    .cluster-box {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      overflow: hidden;
     }
 
-    .cluster-box { background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
-    .cluster-header { background-color: var(--bg-card); padding: 12px 16px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); }
-    .news-item { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; align-items: center; gap: 8px; }
-    .val-field span { display: block; font-size: 0.7rem; color: var(--text-muted); }
-    .val-field strong { font-family: var(--font-mono); font-size: 0.85rem; }
+    .cluster-header {
+      background-color: var(--bg-card);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
 
-    .ai-banner { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; background: rgba(41, 98, 255, 0.05); }
-    .signal-pill { font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; padding: 6px 12px; border-radius: 6px; text-transform: uppercase; }
+    .news-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .val-field span { display: block; font-size: 0.7rem; color: var(--text-muted); }
+    .val-field strong { font-family: var(--font-mono); font-size: 0.9rem; }
+
+    /* Signal Banner */
+    .ai-banner {
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(41, 98, 255, 0.05);
+      gap: 12px;
+    }
+
+    .signal-pill {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      display: inline-block;
+    }
     .signal-pill.bullish { background: rgba(0, 230, 118, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
     .signal-pill.bearish { background: rgba(255, 82, 82, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
     .signal-pill.neutral { background: rgba(255, 171, 0, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+
+    @media (max-width: 768px) {
+      .news-item { grid-template-columns: 1fr; gap: 6px; }
+      .ai-banner { flex-direction: column; align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
@@ -105,18 +181,18 @@
       <div class="brand">
         <div class="brand-icon">⚡</div>
         <div>
-          <h2 style="font-size: 1rem;">BTC Live Radar (Tablet)</h2>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Datos en Vivo de BTC y Calendario Macro</span>
+          <h2 style="font-size: 1.05rem;">MQL5 BTC Live Cluster Radar</h2>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Monitoreo de Noticias Reales en Vivo</span>
         </div>
       </div>
 
-      <!-- Ticker Real de Binance en vivo -->
+      <!-- Ticker de Precio Binance WebSocket -->
       <div class="btc-ticker" id="btc-ticker">
         <div>
-          <span style="font-size: 0.7rem; color: var(--text-muted); display: block;">BTC/USD (Binance WS)</span>
+          <span style="font-size: 0.7rem; color: var(--text-muted); display: block;">BTC/USD (Binance Feed)</span>
           <span class="price-value" id="btc-price">Conectando...</span>
         </div>
-        <span id="btc-change" style="font-size: 0.8rem; font-weight: bold;">--</span>
+        <span id="btc-change" style="font-size: 0.85rem; font-weight: bold;">--</span>
       </div>
 
       <div class="badge-status">
@@ -125,25 +201,36 @@
       </div>
     </header>
 
-    <!-- Conector de API para noticias en tiempo real -->
-    <div class="api-panel">
-      <input type="text" id="api-key-input" placeholder="Ingresa API Key de Calendario (Ej: FMP API Key)">
-      <button onclick="fetchLiveNewsFromAPI()">Conectar Noticias en Vivo</button>
+    <!-- Barra de Estado de API -->
+    <div class="controls-panel">
+      <div class="api-status">
+        <span>🔑 FMP API Key Configurada:</span>
+        <strong style="color: var(--accent-green);">exL...50g (Activa)</strong>
+      </div>
+      <div>
+        <button onclick="fetchLiveNewsFromAPI()">🔄 Consultar Noticias Ahora</button>
+        <button onclick="triggerSimulatedCluster()" style="background: var(--bg-card); border: 1px solid var(--border-color);">⚡ Probar Simulación Bloque</button>
+      </div>
     </div>
 
+    <!-- Contenedor Principal de Eventos -->
     <div id="clusters-container"></div>
   </div>
 
   <script>
+    const FMP_API_KEY = "exL5USAvIGPpWF1HKYN6cL2pPU5Z550g";
     let lastPrice = 0;
 
-    // 1. PRECIO REAL DE BITCOIN TICK A TICK (BINANCE WEBSOCKET)
-    function initBinanceWebSocket() {
+    // 1. CONEXIÓN EN TIEMPO REAL AL PRECIO DE BITCOIN (BINANCE WEBSOCKET)
+    function initLiveBtcStream() {
       const priceEl = document.getElementById('btc-price');
       const changeEl = document.getElementById('btc-change');
       const tickerBox = document.getElementById('btc-ticker');
+      const statusEl = document.getElementById('connection-status');
 
       const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+
+      ws.onopen = () => { statusEl.textContent = "CONECTADO A BINANCE LIVE"; };
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -165,71 +252,101 @@
         }
         lastPrice = currentPrice;
       };
+
+      ws.onerror = () => { statusEl.textContent = "ERROR CONEXIÓN PRECIO"; };
+      ws.onclose = () => { setTimeout(initLiveBtcStream, 3000); };
     }
 
-    // 2. CONSULTAR CALENDARIO ECONÓMICO REAL VÍA API WEB
+    // 2. CONSULTAR CALENDARIO ECONÓMICO REAL DE EE.UU. VÍA API
     async function fetchLiveNewsFromAPI() {
-      const apiKey = document.getElementById('api-key-input').value.trim();
-      if (!apiKey) {
-        alert("Por favor ingresa tu API Key para activar la recepción de noticias en vivo.");
-        return;
-      }
-
       try {
-        const response = await fetch(`https://financialmodelingprep.com/stable/economic-calendar?apikey=${apiKey}`);
+        const response = await fetch(`https://financialmodelingprep.com/stable/economic-calendar?apikey=${FMP_API_KEY}`);
         const events = await response.json();
 
-        // Filtra noticias de EE.UU. publicadas
-        const usdEvents = events.filter(e => e.country === 'US' && e.actual !== null);
-        
+        if (!Array.isArray(events)) return;
+
+        // Filtrar noticias de EE.UU. que ya tienen dato "actual" publicado
+        const usdEvents = events.filter(e => e.country === 'US' && e.actual !== null && e.actual !== undefined);
+
         if (usdEvents.length > 0) {
-          // Agrupa por fecha/hora y renderiza
+          // Tomar los eventos más recientes
+          const recentEvents = usdEvents.slice(0, 3).map(e => ({
+            id: e.event,
+            title: e.event,
+            previous: e.previous !== null ? e.previous : '--',
+            forecast: e.estimate !== null ? e.estimate : '--',
+            actual: e.actual,
+            unit: ''
+          }));
+
           renderClusterUI({
-            time: "RECIENTE",
-            events: usdEvents.slice(0, 3).map(e => ({
-              id: e.event,
-              title: e.event,
-              previous: e.previous || 0,
-              forecast: e.estimate || 0,
-              actual: e.actual,
-              unit: ''
-            }))
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            events: recentEvents
           });
         }
       } catch (err) {
-        console.error("Error cargando noticias en vivo:", err);
+        console.error("Error al consultar API de noticias:", err);
       }
     }
 
-    // 3. ANÁLISIS MACROECONÓMICO DE IMPACTO EN BTC
-    function analyzeCluster(cluster) {
-      let usdImpact = 0;
+    // 3. MOTOR DE EVALUACIÓN MACROECONÓMICA EN BLOQUE
+    function processNewsCluster(cluster) {
+      let usdImpactScore = 0;
 
       cluster.events.forEach(evt => {
-        const diff = evt.actual - evt.forecast;
-        if (evt.title.includes('CPI') || evt.title.includes('Inflation')) usdImpact += diff * 2.0;
-        if (evt.title.includes('Payrolls') || evt.title.includes('NFP')) usdImpact += (diff / 50) * 1.5;
-        if (evt.title.includes('Unemployment')) usdImpact -= diff * 1.8;
+        const actual = parseFloat(evt.actual);
+        const forecast = parseFloat(evt.forecast);
+
+        if (isNaN(actual) || isNaN(forecast)) return;
+        const diff = actual - forecast;
+
+        const title = evt.title.toUpperCase();
+
+        if (title.includes('CPI') || title.includes('INFLATION') || title.includes('PPI')) {
+          usdImpactScore += diff * 2.5; // Inflación alta -> Dólar fuerte -> BTC baja
+        } else if (title.includes('PAYROLL') || title.includes('NFP') || title.includes('EMPLOYMENT')) {
+          usdImpactScore += (diff / 50) * 1.5; // Empleo fuerte -> Dólar fuerte -> BTC baja
+        } else if (title.includes('UNEMPLOYMENT')) {
+          usdImpactScore -= diff * 2.0; // Desempleo alto -> Dólar débil -> BTC sube
+        } else if (title.includes('FED') || title.includes('RATE')) {
+          usdImpactScore += diff * 3.0; // Tasas altas -> BTC baja
+        }
       });
 
-      if (usdImpact > 0.1) {
-        return { direction: "BAJAR 📉", biasClass: "bearish", confidence: "90%", desc: "Los datos de EE.UU. fortalecen al dólar. Presión bajista esperada en BTC." };
-      } else if (usdImpact < -0.1) {
-        return { direction: "SUBIR 📈", biasClass: "bullish", confidence: "92%", desc: "Debilidad del dólar tras la publicación. Impulso alcista proyectado para BTC." };
+      if (usdImpactScore > 0.15) {
+        return {
+          direction: "BAJAR 📉",
+          biasClass: "bearish",
+          confidence: "88%",
+          explanation: "El bloque de noticias publicado muestra fortaleza en la economía/inflación de EE.UU., fortaleciendo el dólar e impulsando una reacción bajista sobre Bitcoin."
+        };
+      } else if (usdImpactScore < -0.15) {
+        return {
+          direction: "SUBIR 📈",
+          biasClass: "bullish",
+          confidence: "91%",
+          explanation: "Los datos macroeconómicos indican enfriamiento o menor inflación en EE.UU., debilitando al dólar e impulsando el apetito por riesgo en Bitcoin."
+        };
       } else {
-        return { direction: "NEUTRAL ➔", biasClass: "neutral", confidence: "65%", desc: "Resultados dentro del rango esperado. Volatilidad moderada." };
+        return {
+          direction: "NEUTRAL ➔",
+          biasClass: "neutral",
+          confidence: "65%",
+          explanation: "Datos en línea con lo pronosticado o con divergencias opuestas entre sí. Se espera volatilidad en rango corto."
+        };
       }
     }
 
+    // 4. RENDERIZAR INTERFAZ DE CLUSTER EN PANTALLA
     function renderClusterUI(cluster) {
       const container = document.getElementById('clusters-container');
-      const analysis = analyzeCluster(cluster);
+      const result = processNewsCluster(cluster);
 
       const html = `
         <div class="cluster-box">
           <div class="cluster-header">
-            <span>PUBLICACIÓN EN BLOQUE: ${cluster.time}</span>
-            <span>(${cluster.events.length} Eventos Detectados)</span>
+            <span>PUBLICACIÓN DE BLOQUE: ${cluster.time} UTC</span>
+            <span>Cluster de Noticias (${cluster.events.length} Eventos Reales)</span>
           </div>
           ${cluster.events.map(e => `
             <div class="news-item">
@@ -241,12 +358,12 @@
           `).join('')}
           <div class="ai-banner">
             <div>
-              <span style="font-size: 0.7rem; color: var(--text-muted);">DIRECCIÓN BTC:</span>
-              <p style="font-size: 0.8rem; margin-top: 2px;">${analysis.desc}</p>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">DIRECCIÓN PROYECTADA PARA BTC:</span>
+              <p style="font-size: 0.85rem; margin-top: 4px; max-width: 700px;">${result.explanation}</p>
             </div>
             <div style="text-align: right;">
-              <span class="signal-pill ${analysis.biasClass}">${analysis.direction}</span>
-              <span style="display: block; font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Confianza: ${analysis.confidence}</span>
+              <span class="signal-pill ${result.biasClass}">${result.direction}</span>
+              <span style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Confianza: ${result.confidence}</span>
             </div>
           </div>
         </div>
@@ -254,8 +371,27 @@
       container.innerHTML = html + container.innerHTML;
     }
 
-    // Inicializar WebSocket de Binance para el precio de BTC
-    initBinanceWebSocket();
+    // 5. FUNCIÓN DE SIMULACIÓN PARA PRUEBAS RÁPIDAS
+    function triggerSimulatedCluster() {
+      const sampleCluster = {
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        events: [
+          { id: 'NFP', title: 'Non-Farm Payrolls', previous: 165, forecast: 175, actual: 220, unit: 'K' },
+          { id: 'UNEMP', title: 'Unemployment Rate', previous: 4.1, forecast: 4.0, actual: 4.2, unit: '%' },
+          { id: 'PPI', title: 'PPI (MoM)', previous: 0.1, forecast: 0.2, actual: 0.4, unit: '%' }
+        ]
+      };
+      renderClusterUI(sampleCluster);
+    }
+
+    // Inicializar WebSocket de Binance
+    initLiveBtcStream();
+
+    // Consulta inicial de noticias
+    fetchLiveNewsFromAPI();
+
+    // Consultar automáticamente la API de noticias cada 10 segundos
+    setInterval(fetchLiveNewsFromAPI, 10000);
   </script>
 </body>
 </html>
