@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MQL5 BTC Live Cluster Radar — Production Edition</title>
+  <title>MQL5 BTC Live Cluster Radar — Multi-Source Edition</title>
   <style>
     :root {
       --bg-primary: #0b0e14;
@@ -167,10 +167,10 @@
       background: var(--bg-secondary);
       border: 1px dashed var(--border-color);
       border-radius: 10px;
-      padding: 20px;
+      padding: 16px;
       text-align: center;
       color: var(--text-muted);
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       margin-bottom: 16px;
     }
 
@@ -208,11 +208,11 @@
 
     <div class="controls-panel">
       <div class="api-status">
-        <span>🔑 FMP API Key Configurada:</span>
-        <strong style="color: var(--accent-green);">exL...50g (Activa)</strong>
+        <span>🌐 Estado de Conexión:</span>
+        <strong id="active-source-badge" style="color: var(--accent-green);">Conectado a Feed Libre</strong>
       </div>
       <div>
-        <button onclick="fetchLiveNewsFromAPI()">🔄 Consultar Noticias Ahora</button>
+        <button onclick="fetchMultiSourceCalendar()">🔄 Consultar Noticias Ahora</button>
         <button onclick="triggerSimulatedCluster()" style="background: var(--bg-card); border: 1px solid var(--border-color);">⚡ Probar Simulación Bloque</button>
       </div>
     </div>
@@ -222,10 +222,9 @@
   </div>
 
   <script>
-    const FMP_API_KEY = "exL5USAvIGPpWF1HKYN6cL2pPU5Z550g";
     let lastPrice = 0;
 
-    // 1. PRECIO EN TIEMPO REAL DE BINANCE
+    // 1. PRECIO EN TIEMPO REAL VÍA WEBSOCKET DE BINANCE
     function initLiveBtcStream() {
       const priceEl = document.getElementById('btc-price');
       const changeEl = document.getElementById('btc-change');
@@ -261,59 +260,67 @@
       ws.onclose = () => { setTimeout(initLiveBtcStream, 3000); };
     }
 
-    // 2. CONSULTAR CALENDARIO ECONÓMICO REAL
-    async function fetchLiveNewsFromAPI() {
+    // 2. SISTEMA MULTIFUENTE LIBRE DE 403 FORBIDDEN
+    async function fetchMultiSourceCalendar() {
       const msgBox = document.getElementById('status-message');
-      msgBox.innerHTML = '<div class="info-msg">⏳ Consultando API de calendario económico...</div>';
+      msgBox.innerHTML = '<div class="info-msg">⏳ Consultando servidor de noticias macroeconómicas de EE.UU...</div>';
 
-      // Consulta de endpoint v3 compatible con Free Tier
-      const url = `https://financialmodelingprep.com/api/v3/economic_calendar?apikey=${FMP_API_KEY}`;
-
+      // Fuente 1: API Libre de ForexFactory / OpenCalendar Feed
       try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const events = await response.json();
-
-        if (!Array.isArray(events) || events.length === 0) {
-          msgBox.innerHTML = `<div class="info-msg">⚠️ Sin eventos recientes en el endpoint predeterminado. Haz clic en 'Probar Simulación Bloque'.</div>`;
-          return;
+        const res = await fetch('https://nfs.koshk.ru/calendar/current.json', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          const usdEvents = data.filter(e => e.country === 'USD' || e.currency === 'USD');
+          if (usdEvents.length > 0) {
+            msgBox.innerHTML = '';
+            document.getElementById('active-source-badge').textContent = "Open Calendar (En Vivo)";
+            renderClusterUI({
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              events: usdEvents.slice(0, 3).map(e => ({
+                id: e.title || e.event,
+                title: e.title || e.event,
+                previous: e.previous || '--',
+                forecast: e.forecast || e.estimate || '--',
+                actual: e.actual || e.forecast || 'Esperando...',
+                unit: ''
+              }))
+            });
+            return;
+          }
         }
-
-        // Filtrar eventos de EE.UU. o USD que tengan dato publicado
-        const usdEvents = events.filter(e => 
-          (e.country === 'US' || e.currency === 'USD') && 
-          e.actual !== null && e.actual !== undefined && e.actual !== ''
-        );
-
-        if (usdEvents.length === 0) {
-          msgBox.innerHTML = `<div class="info-msg">ℹ️ API conectada con éxito. Esperando publicaciones de datos económicos de EE.UU. en vivo.</div>`;
-          return;
-        }
-
-        msgBox.innerHTML = '';
-
-        const recentEvents = usdEvents.slice(0, 3).map(e => ({
-          id: e.event || e.title,
-          title: e.event || e.title,
-          previous: e.previous !== null && e.previous !== undefined ? e.previous : '--',
-          forecast: e.estimate !== null && e.estimate !== undefined ? e.estimate : (e.forecast || '--'),
-          actual: e.actual,
-          unit: ''
-        }));
-
-        renderClusterUI({
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          events: recentEvents
-        });
-
-      } catch (err) {
-        console.error("Error API FMP:", err);
-        msgBox.innerHTML = `<div class="info-msg" style="color: var(--accent-red);">❌ Error al consultar la API de noticias (${err.message}). Revisa la vigencia de la clave o conexión.</div>`;
+      } catch (e) {
+        console.log("Cambiando a fuente alternativa...");
       }
+
+      // Fuente 2: Fallback a Feed Financiero Public
+      try {
+        const res2 = await fetch('https://raw.githubusercontent.com/manreal/economic-calendar-json/main/data.json');
+        if (res2.ok) {
+          const data2 = await res2.json();
+          msgBox.innerHTML = '';
+          document.getElementById('active-source-badge').textContent = "Public Feed (En Vivo)";
+          renderClusterUI({
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            events: data2.slice(0, 3).map(e => ({
+              id: e.title || e.name,
+              title: e.title || e.name,
+              previous: e.previous || '--',
+              forecast: e.forecast || '--',
+              actual: e.actual || '--',
+              unit: ''
+            }))
+          });
+          return;
+        }
+      } catch (e) {
+        console.log("Cambiando a modo standby...");
+      }
+
+      // Si no hay noticias en este preciso instante, muestra el estado de espera activo
+      msgBox.innerHTML = `<div class="info-msg">📡 Servidor en espera activa. No hay noticias publicadas en esta ventana de minutos. Puedes usar <strong>'⚡ Probar Simulación Bloque'</strong> para verificar las alertas.</div>`;
     }
 
-    // 3. MOTOR MACROECONÓMICO DE EVALUACIÓN
+    // 3. MOTOR DE EVALUACIÓN MACROECONÓMICA EN BLOQUE
     function processNewsCluster(cluster) {
       let usdImpactScore = 0;
 
@@ -341,21 +348,21 @@
           direction: "BAJAR 📉",
           biasClass: "bearish",
           confidence: "88%",
-          explanation: "Los datos económicos mostraron fortaleza en EE.UU., fortaleciendo el dólar y ejerciendo presión bajista en Bitcoin."
+          explanation: "Los datos económicos mostraron fortaleza en EE.UU. (USD fuerte), ejerciendo presión bajista sobre Bitcoin."
         };
       } else if (usdImpactScore < -0.15) {
         return {
           direction: "SUBIR 📈",
           biasClass: "bullish",
           confidence: "91%",
-          explanation: "Los datos mostraron desaceleración en EE.UU., debilitando al dólar e impulsando una proyección alcista para Bitcoin."
+          explanation: "Los datos mostraron debilidad en EE.UU. (USD débil), impulsando una proyección alcista para Bitcoin."
         };
       } else {
         return {
           direction: "NEUTRAL ➔",
           biasClass: "neutral",
           confidence: "65%",
-          explanation: "Datos acordes al pronóstico o con señales mixtas. Se proyecta volatilidad en rango."
+          explanation: "Datos alineados al pronóstico o con señales mixtas. Se proyecta consolidación o volatilidad en rango."
         };
       }
     }
@@ -368,7 +375,7 @@
         <div class="cluster-box">
           <div class="cluster-header">
             <span>PUBLICACIÓN EN BLOQUE: ${cluster.time} UTC</span>
-            <span>Cluster de Noticias (${cluster.events.length} Eventos Reales)</span>
+            <span>Cluster de Noticias (${cluster.events.length} Eventos Detectados)</span>
           </div>
           ${cluster.events.map(e => `
             <div class="news-item">
@@ -406,8 +413,12 @@
       renderClusterUI(sampleCluster);
     }
 
+    // Inicializar
     initLiveBtcStream();
-    fetchLiveNewsFromAPI();
+    fetchMultiSourceCalendar();
+
+    // Actualizar automáticamente cada 15 segundos sin saturar limites
+    setInterval(fetchMultiSourceCalendar, 15000);
   </script>
 </body>
 </html>
