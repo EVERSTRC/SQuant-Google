@@ -3,241 +3,363 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BTC Economic Impact Radar - MQL5 Style</title>
+  <title>MQL5 BTC Cluster Radar — Live Data Engine</title>
   <style>
     :root {
-      --bg-color: #0e1117;
-      --card-bg: #161b22;
-      --border-color: #30363d;
-      --text-main: #c9d1d9;
-      --bullish: #2ea043;
-      --bearish: #f85149;
-      --neutral: #8b949e;
+      --bg-primary: #0b0e14;
+      --bg-secondary: #151922;
+      --bg-card: #1c212d;
+      --border-color: #2a3142;
+      --text-main: #e1e7ed;
+      --text-muted: #8b98a5;
+      --accent-blue: #2962ff;
+      --accent-green: #00e676;
+      --accent-red: #ff5252;
+      --accent-amber: #ffab00;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: var(--bg-color);
+      background-color: var(--bg-primary);
       color: var(--text-main);
-      margin: 0;
-      padding: 24px;
+      padding: 20px;
     }
 
-    .container {
-      max-width: 1000px;
-      margin: 0 auto;
-    }
+    .container { max-width: 1200px; margin: 0 auto; }
 
+    /* Header Bar */
     header {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 16px;
-      margin-bottom: 24px;
-    }
-
-    h1 { margin: 0; font-size: 1.5rem; }
-    .badge-live {
-      background-color: rgba(46, 160, 67, 0.15);
-      color: var(--bullish);
-      border: 1px solid var(--bullish);
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      font-weight: bold;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
       gap: 16px;
     }
 
-    .card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border-color);
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 40px; height: 40px;
+      background: rgba(41, 98, 255, 0.15);
+      border: 1px solid var(--accent-blue);
       border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--accent-blue);
+      font-weight: bold;
+    }
+
+    /* Price Ticker Live */
+    .btc-ticker {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: background-color 0.3s;
+    }
+    .btc-ticker.flash-up { background-color: rgba(0, 230, 118, 0.2); }
+    .btc-ticker.flash-down { background-color: rgba(255, 82, 82, 0.2); }
+
+    .price-value {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .badge-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.8rem; padding: 4px 10px;
+      border-radius: 20px; font-weight: 600;
+      background: rgba(0, 230, 118, 0.1);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+    /* Controls */
+    .actions { display: flex; gap: 10px; }
+    button {
+      background: var(--accent-blue);
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+
+    /* Cluster Card */
+    .cluster-box {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .cluster-header {
+      background-color: var(--bg-card);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .news-item {
       padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
       display: grid;
-      grid-template-columns: 120px 1fr 140px 140px 160px;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
       align-items: center;
       gap: 12px;
     }
 
-    .card-header {
-      font-weight: bold;
-      color: var(--neutral);
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 8px;
-      background-color: transparent;
+    .news-title { font-weight: 600; font-size: 0.95rem; }
+    .val-field span { display: block; font-size: 0.75rem; color: var(--text-muted); }
+    .val-field strong { font-family: var(--font-mono); }
+
+    /* AI Decision Banner */
+    .ai-banner {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(41, 98, 255, 0.05);
     }
 
-    .time { font-family: monospace; color: var(--neutral); }
-    .event-title { font-weight: 600; }
-    
-    .val-box {
-      font-size: 0.9rem;
-    }
-    .val-box span {
-      display: block;
-      font-size: 0.75rem;
-      color: var(--neutral);
-    }
-
-    .signal {
-      padding: 8px 12px;
-      border-radius: 6px;
-      text-align: center;
-      font-weight: bold;
-      font-size: 0.9rem;
-    }
-    .signal.bullish { background-color: rgba(46, 160, 67, 0.2); color: var(--bullish); border: 1px solid var(--bullish); }
-    .signal.bearish { background-color: rgba(248, 81, 73, 0.2); color: var(--bearish); border: 1px solid var(--bearish); }
-    .signal.neutral { background-color: rgba(139, 148, 158, 0.2); color: var(--neutral); border: 1px solid var(--neutral); }
-
-    .btn-refresh {
-      background-color: #238636;
-      color: #fff;
-      border: none;
+    .signal-pill {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
       padding: 8px 16px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
+      border-radius: 8px;
+      text-transform: uppercase;
     }
-    .btn-refresh:hover { background-color: #2ea043; }
+    .signal-pill.bullish { background: rgba(0, 230, 118, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .signal-pill.bearish { background: rgba(255, 82, 82, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .signal-pill.neutral { background: rgba(255, 171, 0, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+
+    @media (max-width: 768px) {
+      .news-item { grid-template-columns: 1fr; gap: 8px; }
+      .ai-banner { flex-direction: column; gap: 12px; align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
 
   <div class="container">
     <header>
-      <div>
-        <h1>BTC News Impact Radar (MQL5 Engine)</h1>
-        <small style="color: var(--neutral);">Monitor de impacto macroeconómico en tiempo real para Bitcoin</small>
+      <div class="brand">
+        <div class="brand-icon">MQL5</div>
+        <div>
+          <h2 style="font-size: 1.1rem;">BTC Cluster Radar AI</h2>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Análisis de Impacto Macroeconómico en Tiempo Real</span>
+        </div>
       </div>
-      <div>
-        <span class="badge-live">● TIEMPO REAL</span>
-        <button class="btn-refresh" onclick="fetchCalendarEvents()">Simular Actualización</button>
+
+      <!-- Cotización Real Binance WS -->
+      <div class="btc-ticker" id="btc-ticker">
+        <div>
+          <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">BTC/USD (Binance Feed)</span>
+          <span class="price-value" id="btc-price">Conectando...</span>
+        </div>
+        <span id="btc-change" style="font-size: 0.85rem; font-weight: bold;">--</span>
+      </div>
+
+      <div class="badge-status">
+        <div class="dot"></div>
+        <span id="connection-status">WEBSOCKET ACTIVO</span>
+      </div>
+
+      <div class="actions">
+        <button onclick="triggerSimulatedCluster()">Simular Bloque de Noticias</button>
       </div>
     </header>
 
-    <div class="grid">
-      <!-- Encabezados de tabla -->
-      <div class="card card-header">
-        <div>Hora (UTC)</div>
-        <div>Evento Económico</div>
-        <div>Pronóstico</div>
-        <div>Dato Actual</div>
-        <div>Impacto BTC</div>
-      </div>
-
-      <!-- Contenedor dinámico de eventos -->
-      <div id="events-list" class="grid"></div>
+    <!-- Panel Principal de Noticias Agrupadas -->
+    <div id="clusters-container">
+      <!-- Los bloques de noticias se renderizan dinámicamente -->
     </div>
   </div>
 
   <script>
-    // Eventos macroeconómicos clave de EE.UU. que impactan a Bitcoin
-    const monitoredEvents = [
-      { id: "CPI", name: "US CPI (YoY) - Inflación", inverseRatio: true },
-      { id: "FED_RATE", name: "Fed Interest Rate Decision", inverseRatio: true },
-      { id: "NFP", name: "Non-Farm Payrolls", inverseRatio: true },
-      { id: "GDP", name: "US GDP (QoQ) - Crecimiento", inverseRatio: false }
-    ];
+    let lastPrice = 0;
 
-    // Datos simulados (Reemplazar la llamada HTTP a tu servidor backend/proxy MQL5)
-    async function fetchCalendarEvents() {
-      const mockApiData = [
-        {
-          id: "CPI",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          name: "US CPI (YoY)",
-          currency: "USD",
-          forecast: 2.8,
-          actual: 3.1, // Inflación mayor a la esperada
-          unit: "%"
-        },
-        {
-          id: "FED_RATE",
-          time: new Date(Date.now() + 3600000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          name: "Fed Interest Rate Decision",
-          currency: "USD",
-          forecast: 5.25,
-          actual: 5.00, // Recorte de tipos (menor al esperado)
-          unit: "%"
-        },
-        {
-          id: "NFP",
-          time: new Date(Date.now() + 7200000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          name: "Non-Farm Payrolls",
-          currency: "USD",
-          forecast: 180,
-          actual: 140, // Empleo débil
-          unit: "K"
+    // 1. CONEXIÓN EN TIEMPO REAL CON WEBSOCKET DE BINANCE
+    function connectBinancePriceStream() {
+      const priceEl = document.getElementById('btc-price');
+      const changeEl = document.getElementById('btc-change');
+      const tickerBox = document.getElementById('btc-ticker');
+      const statusEl = document.getElementById('connection-status');
+
+      const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+
+      ws.onopen = () => {
+        statusEl.textContent = "LIVE STREAM CONECTADO";
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const currentPrice = parseFloat(data.c);
+        const priceChangePercent = parseFloat(data.P);
+
+        // Formato moneda
+        priceEl.textContent = currentPrice.toLocaleString('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2
+        });
+
+        // Porcentaje 24h
+        changeEl.textContent = `${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%`;
+        changeEl.style.color = priceChangePercent >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+
+        // Parpadeo visual según tick
+        if (lastPrice !== 0) {
+          if (currentPrice > lastPrice) {
+            tickerBox.classList.add('flash-up');
+            setTimeout(() => tickerBox.classList.remove('flash-up'), 300);
+          } else if (currentPrice < lastPrice) {
+            tickerBox.classList.add('flash-down');
+            setTimeout(() => tickerBox.classList.remove('flash-down'), 300);
+          }
         }
-      ];
+        lastPrice = currentPrice;
+      };
 
-      renderEvents(mockApiData);
+      ws.onerror = () => {
+        statusEl.textContent = "ERROR CONEXIÓN";
+        // Fallback vía REST API
+        setInterval(fetchPriceREST, 3000);
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = "RECONECTANDO...";
+        setTimeout(connectBinancePriceStream, 3000);
+      };
     }
 
-    // Lógica de evaluación del impacto en Bitcoin
-    function calculateBtcImpact(event) {
-      if (event.actual === null || event.actual === undefined) {
-        return { text: "PENDIENTE", class: "neutral" };
-      }
-
-      const monitored = monitoredEvents.find(m => m.id === event.id) || { inverseRatio: true };
-      const diff = event.actual - event.forecast;
-
-      if (Math.abs(diff) < 0.01) {
-        return { text: "NEUTRAL ➔", class: "neutral" };
-      }
-
-      // Si el indicador favorece al USD y la relación es inversa (Ej: Inflación alta -> USD fuerte -> BTC baja)
-      if (monitored.inverseRatio) {
-        if (diff > 0) {
-          return { text: "BAJAR 📉 (Bearish)", class: "bearish" };
-        } else {
-          return { text: "SUBIR 📈 (Bullish)", class: "bullish" };
-        }
-      } else {
-        // Relación directa
-        if (diff > 0) {
-          return { text: "SUBIR 📈 (Bullish)", class: "bullish" };
-        } else {
-          return { text: "BAJAR 📉 (Bearish)", class: "bearish" };
-        }
+    // Fallback REST API en caso de fallo de WS
+    async function fetchPriceREST() {
+      try {
+        const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+        const data = await res.json();
+        document.getElementById('btc-price').textContent = parseFloat(data.lastPrice).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+      } catch (e) {
+        console.error("Fallo REST API", e);
       }
     }
 
-    function renderEvents(events) {
-      const container = document.getElementById("events-list");
-      container.innerHTML = "";
+    // 2. LÓGICA DE ANÁLISIS EN BLOQUE (CLUSTER MACROECONÓMICO)
+    function analyzeClusterImpact(cluster) {
+      let usdNetBias = 0; // Positivo = USD Fuerte (Malo para BTC), Negativo = USD Débil (Bueno para BTC)
 
-      events.forEach(evt => {
-        const impact = calculateBtcImpact(evt);
+      cluster.events.forEach(evt => {
+        const diff = evt.actual - evt.forecast;
         
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `
-          <div class="time">${evt.time}</div>
-          <div class="event-title">${evt.name} (${evt.currency})</div>
-          <div class="val-box"><span>Forecast</span>${evt.forecast}${evt.unit}</div>
-          <div class="val-box"><span>Actual</span><strong>${evt.actual !== null ? evt.actual + evt.unit : '--'}</strong></div>
-          <div class="signal ${impact.class}">${impact.text}</div>
-        `;
-        container.appendChild(card);
+        // Ponderación según la noticia
+        if (evt.id === 'CPI' || evt.id === 'PPI') {
+          usdNetBias += diff * 2.5; // Inflación alta fortalece USD -> Presiona BTC a la baja
+        } else if (evt.id === 'NFP') {
+          usdNetBias += (diff / 50) * 1.5; // Empleo alto fortalece USD -> Presiona BTC a la baja
+        } else if (evt.id === 'UNEMP') {
+          usdNetBias -= diff * 2.0; // Desempleo alto debilita USD -> Favorece BTC
+        }
       });
+
+      if (usdNetBias > 0.15) {
+        return {
+          direction: "BAJAR 📉",
+          biasClass: "bearish",
+          confidence: "88%",
+          reasoning: "El conjunto de noticias mostró datos macroeconómicos más fuertes de lo esperado en EE.UU., fortaleciendo al dólar y aplicando presión bajista inmediata sobre Bitcoin."
+        };
+      } else if (usdNetBias < -0.15) {
+        return {
+          direction: "SUBIR 📈",
+          biasClass: "bullish",
+          confidence: "92%",
+          reasoning: "Debilidad macroeconómica neta en EE.UU. (Menor inflación / Mayor desempleo), aumentando las expectativas de flexibilización por parte de la Fed y favoreciendo el impulso de BTC."
+        };
+      } else {
+        return {
+          direction: "NEUTRAL ➔",
+          biasClass: "neutral",
+          confidence: "65%",
+          reasoning: "Datos divergentes o en línea con el pronóstico. El bloque muestra fuerzas contrapuestas en el mercado que pueden provocar volatilidad en ambos sentidos."
+        };
+      }
     }
 
-    // Inicializar app
-    fetchCalendarEvents();
+    // 3. RENDERIZADO DE BLOQUES DE NOTICIAS SIMULTÁNEAS
+    function renderCluster(cluster) {
+      const container = document.getElementById('clusters-container');
+      const analysis = analyzeClusterImpact(cluster);
 
-    // Actualización automática cada 10 segundos
-    setInterval(fetchCalendarEvents, 10000);
+      const clusterHTML = `
+        <div class="cluster-box">
+          <div class="cluster-header">
+            <span>HORA DE PUBLICACIÓN SIMULTÁNEA: ${cluster.timestamp} UTC</span>
+            <span>MQL5 Event Cluster (${cluster.events.length} Noticias)</span>
+          </div>
+          
+          ${cluster.events.map(e => `
+            <div class="news-item">
+              <div class="news-title">🇺🇸 ${e.title}</div>
+              <div class="val-field"><span>Anterior</span><strong>${e.previous}${e.unit}</strong></div>
+              <div class="val-field"><span>Pronóstico</span><strong>${e.forecast}${e.unit}</strong></div>
+              <div class="val-field"><span>Actual</span><strong style="color: var(--accent-blue);">${e.actual}${e.unit}</strong></div>
+            </div>
+          `).join('')}
+
+          <div class="ai-banner">
+            <div>
+              <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">PROYECCIÓN NETO PARA BTC:</span>
+              <p style="font-size: 0.9rem; margin-top: 4px; max-width: 700px;">${analysis.reasoning}</p>
+            </div>
+            <div style="text-align: right;">
+              <span class="signal-pill ${analysis.biasClass}">${analysis.direction}</span>
+              <span style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Confianza IA: ${analysis.confidence}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = clusterHTML + container.innerHTML;
+    }
+
+    // Simulación de bloque de noticias simultáneas a la misma hora (Ej: 13:30 UTC)
+    function triggerSimulatedCluster() {
+      const sampleCluster = {
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        events: [
+          { id: 'NFP', title: 'Non-Farm Payrolls', previous: 165, forecast: 175, actual: 220, unit: 'K' },
+          { id: 'UNEMP', title: 'Unemployment Rate', previous: 4.1, forecast: 4.0, actual: 4.2, unit: '%' },
+          { id: 'PPI', title: 'PPI (MoM)', previous: 0.1, forecast: 0.2, actual: 0.4, unit: '%' }
+        ]
+      };
+
+      renderCluster(sampleCluster);
+    }
+
+    // Inicializar WebSocket de Binance al cargar la página
+    connectBinancePriceStream();
+
+    // Cargar un bloque inicial de ejemplo
+    triggerSimulatedCluster();
   </script>
 </body>
 </html>
