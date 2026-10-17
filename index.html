@@ -225,7 +225,7 @@
     const FMP_API_KEY = "exL5USAvIGPpWF1HKYN6cL2pPU5Z550g";
     let lastPrice = 0;
 
-    // 1. CONEXIÓN EN TIEMPO REAL AL PRECIO DE BITCOIN
+    // 1. PRECIO EN TIEMPO REAL DE BINANCE
     function initLiveBtcStream() {
       const priceEl = document.getElementById('btc-price');
       const changeEl = document.getElementById('btc-change');
@@ -261,57 +261,43 @@
       ws.onclose = () => { setTimeout(initLiveBtcStream, 3000); };
     }
 
-    // Obtener fecha en formato YYYY-MM-DD
-    function formatDate(d) {
-      return d.toISOString().split('T')[0];
-    }
-
-    // 2. CONSULTAR CALENDARIO ECONÓMICO REAL CON PARÁMETROS DE FECHA
+    // 2. CONSULTAR CALENDARIO ECONÓMICO REAL
     async function fetchLiveNewsFromAPI() {
       const msgBox = document.getElementById('status-message');
-      msgBox.innerHTML = '<div class="info-msg">⏳ Consultando API de calendario económico en vivo...</div>';
+      msgBox.innerHTML = '<div class="info-msg">⏳ Consultando API de calendario económico...</div>';
 
-      const today = new Date();
-      const pastDate = new Date();
-      pastDate.setDate(today.getDate() - 7); // Últimos 7 días
-
-      const fromStr = formatDate(pastDate);
-      const toStr = formatDate(today);
-
-      const url = `https://financialmodelingprep.com/stable/economic-calendar?from=${fromStr}&to=${toStr}&apikey=${FMP_API_KEY}`;
+      // Consulta de endpoint v3 compatible con Free Tier
+      const url = `https://financialmodelingprep.com/api/v3/economic_calendar?apikey=${FMP_API_KEY}`;
 
       try {
         const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Respuesta HTTP ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const events = await response.json();
 
         if (!Array.isArray(events) || events.length === 0) {
-          msgBox.innerHTML = `<div class="info-msg">⚠️ No se encontraron eventos de noticias en el rango de fechas (${fromStr} a ${toStr}). Puedes presionar 'Probar Simulación Bloque' para testear la interfaz.</div>`;
+          msgBox.innerHTML = `<div class="info-msg">⚠️ Sin eventos recientes en el endpoint predeterminado. Haz clic en 'Probar Simulación Bloque'.</div>`;
           return;
         }
 
-        // Filtrar noticias de EE.UU. / USD que tengan dato publicado (actual)
+        // Filtrar eventos de EE.UU. o USD que tengan dato publicado
         const usdEvents = events.filter(e => 
           (e.country === 'US' || e.currency === 'USD') && 
           e.actual !== null && e.actual !== undefined && e.actual !== ''
         );
 
         if (usdEvents.length === 0) {
-          msgBox.innerHTML = `<div class="info-msg">ℹ️ La API respondió correctamente (${events.length} eventos globales), pero no hay publicaciones recientes con dato 'Actual' disponible para EE.UU. en las últimas horas.</div>`;
+          msgBox.innerHTML = `<div class="info-msg">ℹ️ API conectada con éxito. Esperando publicaciones de datos económicos de EE.UU. en vivo.</div>`;
           return;
         }
 
-        msgBox.innerHTML = ''; // Limpiar mensaje si hay datos
+        msgBox.innerHTML = '';
 
-        // Tomar las 3 publicaciones más recientes
         const recentEvents = usdEvents.slice(0, 3).map(e => ({
           id: e.event || e.title,
           title: e.event || e.title,
           previous: e.previous !== null && e.previous !== undefined ? e.previous : '--',
-          forecast: e.estimate !== null && e.estimate !== undefined ? e.estimate : '--',
+          forecast: e.estimate !== null && e.estimate !== undefined ? e.estimate : (e.forecast || '--'),
           actual: e.actual,
           unit: ''
         }));
@@ -322,12 +308,12 @@
         });
 
       } catch (err) {
-        console.error("Error al consultar API de noticias:", err);
-        msgBox.innerHTML = `<div class="info-msg" style="color: var(--accent-red);">❌ Error consultando la API de FMP (${err.message}). Revisa la vigencia de la API Key o los permisos de la cuenta.</div>`;
+        console.error("Error API FMP:", err);
+        msgBox.innerHTML = `<div class="info-msg" style="color: var(--accent-red);">❌ Error al consultar la API de noticias (${err.message}). Revisa la vigencia de la clave o conexión.</div>`;
       }
     }
 
-    // 3. MOTOR DE EVALUACIÓN MACROECONÓMICA EN BLOQUE
+    // 3. MOTOR MACROECONÓMICO DE EVALUACIÓN
     function processNewsCluster(cluster) {
       let usdImpactScore = 0;
 
@@ -337,7 +323,6 @@
 
         if (isNaN(actual) || isNaN(forecast)) return;
         const diff = actual - forecast;
-
         const title = (evt.title || '').toUpperCase();
 
         if (title.includes('CPI') || title.includes('INFLATION') || title.includes('PPI')) {
@@ -356,26 +341,25 @@
           direction: "BAJAR 📉",
           biasClass: "bearish",
           confidence: "88%",
-          explanation: "El bloque de noticias publicado muestra fortaleza en la economía/inflación de EE.UU., fortaleciendo el dólar e impulsando una reacción bajista sobre Bitcoin."
+          explanation: "Los datos económicos mostraron fortaleza en EE.UU., fortaleciendo el dólar y ejerciendo presión bajista en Bitcoin."
         };
       } else if (usdImpactScore < -0.15) {
         return {
           direction: "SUBIR 📈",
           biasClass: "bullish",
           confidence: "91%",
-          explanation: "Los datos macroeconómicos indican enfriamiento o menor inflación en EE.UU., debilitando al dólar e impulsando el apetito por riesgo en Bitcoin."
+          explanation: "Los datos mostraron desaceleración en EE.UU., debilitando al dólar e impulsando una proyección alcista para Bitcoin."
         };
       } else {
         return {
           direction: "NEUTRAL ➔",
           biasClass: "neutral",
           confidence: "65%",
-          explanation: "Datos en línea con lo pronosticado o con divergencias opuestas entre sí. Se espera volatilidad en rango corto."
+          explanation: "Datos acordes al pronóstico o con señales mixtas. Se proyecta volatilidad en rango."
         };
       }
     }
 
-    // 4. RENDERIZAR INTERFAZ DE CLUSTER EN PANTALLA
     function renderClusterUI(cluster) {
       const container = document.getElementById('clusters-container');
       const result = processNewsCluster(cluster);
@@ -383,7 +367,7 @@
       const html = `
         <div class="cluster-box">
           <div class="cluster-header">
-            <span>PUBLICACIÓN DE BLOQUE: ${cluster.time} UTC</span>
+            <span>PUBLICACIÓN EN BLOQUE: ${cluster.time} UTC</span>
             <span>Cluster de Noticias (${cluster.events.length} Eventos Reales)</span>
           </div>
           ${cluster.events.map(e => `
@@ -409,7 +393,6 @@
       container.innerHTML = html + container.innerHTML;
     }
 
-    // 5. FUNCIÓN DE SIMULACIÓN PARA PRUEBAS
     function triggerSimulatedCluster() {
       document.getElementById('status-message').innerHTML = '';
       const sampleCluster = {
@@ -423,10 +406,7 @@
       renderClusterUI(sampleCluster);
     }
 
-    // Inicializar WebSocket de Binance
     initLiveBtcStream();
-
-    // Consulta inicial al cargar la página
     fetchLiveNewsFromAPI();
   </script>
 </body>
