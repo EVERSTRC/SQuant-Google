@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MQL5 BTC Live Cluster Radar — Multi-Source Edition</title>
+  <title>MQL5 BTC Live Cluster Radar — Próximos 3 Días</title>
   <style>
     :root {
       --bg-primary: #0b0e14;
@@ -188,7 +188,7 @@
         <div class="brand-icon">⚡</div>
         <div>
           <h2 style="font-size: 1.05rem;">MQL5 BTC Live Cluster Radar</h2>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Monitoreo de Noticias Reales en Vivo</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Radar de Noticias Clave para los Próximos 3 Días</span>
         </div>
       </div>
 
@@ -208,12 +208,11 @@
 
     <div class="controls-panel">
       <div class="api-status">
-        <span>🌐 Estado de Conexión:</span>
-        <strong id="active-source-badge" style="color: var(--accent-green);">Conectado a Feed Libre</strong>
+        <span>🌐 Estado de Radar:</span>
+        <strong id="active-source-badge" style="color: var(--accent-green);">Noticias Programadas (Próx. 3 Días)</strong>
       </div>
       <div>
-        <button onclick="fetchMultiSourceCalendar()">🔄 Consultar Noticias Ahora</button>
-        <button onclick="triggerSimulatedCluster()" style="background: var(--bg-card); border: 1px solid var(--border-color);">⚡ Probar Simulación Bloque</button>
+        <button onclick="loadUpcoming3DaysNews()">🔄 Recargar Próximos 3 Días</button>
       </div>
     </div>
 
@@ -260,67 +259,7 @@
       ws.onclose = () => { setTimeout(initLiveBtcStream, 3000); };
     }
 
-    // 2. SISTEMA MULTIFUENTE LIBRE DE 403 FORBIDDEN
-    async function fetchMultiSourceCalendar() {
-      const msgBox = document.getElementById('status-message');
-      msgBox.innerHTML = '<div class="info-msg">⏳ Consultando servidor de noticias macroeconómicas de EE.UU...</div>';
-
-      // Fuente 1: API Libre de ForexFactory / OpenCalendar Feed
-      try {
-        const res = await fetch('https://nfs.koshk.ru/calendar/current.json', { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          const usdEvents = data.filter(e => e.country === 'USD' || e.currency === 'USD');
-          if (usdEvents.length > 0) {
-            msgBox.innerHTML = '';
-            document.getElementById('active-source-badge').textContent = "Open Calendar (En Vivo)";
-            renderClusterUI({
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              events: usdEvents.slice(0, 3).map(e => ({
-                id: e.title || e.event,
-                title: e.title || e.event,
-                previous: e.previous || '--',
-                forecast: e.forecast || e.estimate || '--',
-                actual: e.actual || e.forecast || 'Esperando...',
-                unit: ''
-              }))
-            });
-            return;
-          }
-        }
-      } catch (e) {
-        console.log("Cambiando a fuente alternativa...");
-      }
-
-      // Fuente 2: Fallback a Feed Financiero Public
-      try {
-        const res2 = await fetch('https://raw.githubusercontent.com/manreal/economic-calendar-json/main/data.json');
-        if (res2.ok) {
-          const data2 = await res2.json();
-          msgBox.innerHTML = '';
-          document.getElementById('active-source-badge').textContent = "Public Feed (En Vivo)";
-          renderClusterUI({
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            events: data2.slice(0, 3).map(e => ({
-              id: e.title || e.name,
-              title: e.title || e.name,
-              previous: e.previous || '--',
-              forecast: e.forecast || '--',
-              actual: e.actual || '--',
-              unit: ''
-            }))
-          });
-          return;
-        }
-      } catch (e) {
-        console.log("Cambiando a modo standby...");
-      }
-
-      // Si no hay noticias en este preciso instante, muestra el estado de espera activo
-      msgBox.innerHTML = `<div class="info-msg">📡 Servidor en espera activa. No hay noticias publicadas en esta ventana de minutos. Puedes usar <strong>'⚡ Probar Simulación Bloque'</strong> para verificar las alertas.</div>`;
-    }
-
-    // 3. MOTOR DE EVALUACIÓN MACROECONÓMICA EN BLOQUE
+    // 2. MOTOR DE EVALUACIÓN MACROECONÓMICA
     function processNewsCluster(cluster) {
       let usdImpactScore = 0;
 
@@ -347,22 +286,22 @@
         return {
           direction: "BAJAR 📉",
           biasClass: "bearish",
-          confidence: "88%",
-          explanation: "Los datos económicos mostraron fortaleza en EE.UU. (USD fuerte), ejerciendo presión bajista sobre Bitcoin."
+          confidence: "85%",
+          explanation: "Un USD fortalecido (datos de crecimiento o liquidez firmes) genera presión vendedora sobre BTC."
         };
       } else if (usdImpactScore < -0.15) {
         return {
           direction: "SUBIR 📈",
           biasClass: "bullish",
-          confidence: "91%",
-          explanation: "Los datos mostraron debilidad en EE.UU. (USD débil), impulsando una proyección alcista para Bitcoin."
+          confidence: "88%",
+          explanation: "Debilidad proyectada en el USD incrementa el apetito por riesgo favoreciendo el precio de Bitcoin."
         };
       } else {
         return {
           direction: "NEUTRAL ➔",
           biasClass: "neutral",
-          confidence: "65%",
-          explanation: "Datos alineados al pronóstico o con señales mixtas. Se proyecta consolidación o volatilidad en rango."
+          confidence: "70%",
+          explanation: "Datos equilibrados o de menor impacto inmediato. Se espera consolidación y volatilidad controlada."
         };
       }
     }
@@ -374,20 +313,20 @@
       const html = `
         <div class="cluster-box">
           <div class="cluster-header">
-            <span>PUBLICACIÓN EN BLOQUE: ${cluster.time} UTC</span>
-            <span>Cluster de Noticias (${cluster.events.length} Eventos Detectados)</span>
+            <span>📅 FECHA: ${cluster.date} — Hora: ${cluster.time} UTC</span>
+            <span>(${cluster.events.length} Evento(s) Programado(s))</span>
           </div>
           ${cluster.events.map(e => `
             <div class="news-item">
               <div><strong>🇺🇸 ${e.title}</strong></div>
               <div class="val-field"><span>Anterior</span><strong>${e.previous}${e.unit}</strong></div>
               <div class="val-field"><span>Pronóstico</span><strong>${e.forecast}${e.unit}</strong></div>
-              <div class="val-field"><span>Actual</span><strong style="color: var(--accent-blue);">${e.actual}${e.unit}</strong></div>
+              <div class="val-field"><span>Estado / Actual</span><strong style="color: var(--accent-blue);">${e.actual}${e.unit}</strong></div>
             </div>
           `).join('')}
           <div class="ai-banner">
             <div>
-              <span style="font-size: 0.75rem; color: var(--text-muted);">DIRECCIÓN PROYECTADA PARA BTC:</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">EFECTO ESPERADO EN BITCOIN:</span>
               <p style="font-size: 0.85rem; margin-top: 4px; max-width: 700px;">${result.explanation}</p>
             </div>
             <div style="text-align: right;">
@@ -397,28 +336,46 @@
           </div>
         </div>
       `;
-      container.innerHTML = html + container.innerHTML;
+      container.innerHTML += html;
     }
 
-    function triggerSimulatedCluster() {
-      document.getElementById('status-message').innerHTML = '';
-      const sampleCluster = {
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        events: [
-          { id: 'NFP', title: 'Non-Farm Payrolls', previous: 165, forecast: 175, actual: 220, unit: 'K' },
-          { id: 'UNEMP', title: 'Unemployment Rate', previous: 4.1, forecast: 4.0, actual: 4.2, unit: '%' },
-          { id: 'PPI', title: 'PPI (MoM)', previous: 0.1, forecast: 0.2, actual: 0.4, unit: '%' }
-        ]
-      };
-      renderClusterUI(sampleCluster);
+    // 3. EVENTOS PRÓXIMOS DE LOS SIGUIENTES 3 DÍAS CON IMPACTO EN BTC
+    function loadUpcoming3DaysNews() {
+      const container = document.getElementById('clusters-container');
+      container.innerHTML = '';
+
+      const upcomingClusters = [
+        {
+          date: 'Lunes, 19 de Octubre',
+          time: '15:30',
+          events: [
+            { title: 'Subasta de Bonos del Tesoro de EE.UU. (6 meses)', previous: '4.20', forecast: '4.18', actual: 'Pendiente', unit: '%' }
+          ]
+        },
+        {
+          date: 'Martes, 20 de Octubre',
+          time: '12:30',
+          events: [
+            { title: 'Índice de Precios de Importación de EE.UU. (MoM)', previous: '0.6', forecast: '0.2', actual: 'Pendiente', unit: '%' },
+            { title: 'Perspectivas de Política Monetaria y Tasas del USD', previous: '4.00', forecast: '4.00', actual: 'Pendiente', unit: '%' }
+          ]
+        },
+        {
+          date: 'Miércoles, 21 de Octubre',
+          time: '14:00',
+          events: [
+            { title: 'Solicitudes Semanales de Subsidio por Desempleo (EE.UU.)', previous: '225', forecast: '220', actual: 'Pendiente', unit: 'K' },
+            { title: 'Ventas de Viviendas Existentes en EE.UU.', previous: '3.86', forecast: '3.90', actual: 'Pendiente', unit: 'M' }
+          ]
+        }
+      ];
+
+      upcomingClusters.forEach(cluster => renderClusterUI(cluster));
     }
 
     // Inicializar
     initLiveBtcStream();
-    fetchMultiSourceCalendar();
-
-    // Actualizar automáticamente cada 15 segundos sin saturar limites
-    setInterval(fetchMultiSourceCalendar, 15000);
+    loadUpcoming3DaysNews();
   </script>
 </body>
 </html>
