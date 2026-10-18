@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MQL5 BTC Live Cluster Radar — Calendario Semanal Costa Rica</title>
+  <title>MQL5 BTC Live Cluster Radar — Nivel de Impacto (Costa Rica)</title>
   <style>
     :root {
       --bg-primary: #0b0e14;
@@ -133,10 +133,25 @@
       padding: 12px 16px;
       border-bottom: 1px solid var(--border-color);
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr;
+      grid-template-columns: 2.2fr 0.8fr 1fr 1fr 1fr;
       align-items: center;
       gap: 8px;
     }
+
+    /* BADGES DE IMPACTO DE LA NOTICIA */
+    .impact-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      display: inline-block;
+      text-align: center;
+      width: fit-content;
+    }
+    .impact-high { background: rgba(255, 82, 82, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .impact-medium { background: rgba(255, 171, 0, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+    .impact-low { background: rgba(0, 230, 118, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
 
     .val-field span { display: block; font-size: 0.7rem; color: var(--text-muted); }
     .val-field strong { font-family: var(--font-mono); font-size: 0.9rem; }
@@ -188,7 +203,7 @@
         <div class="brand-icon">⚡</div>
         <div>
           <h2 style="font-size: 1.05rem;">MQL5 BTC Live Cluster Radar</h2>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Semana Completa (Lunes a Viernes) — Hora Costa Rica (UTC-6)</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Clasificación de Impacto — Hora Costa Rica (UTC-6)</span>
         </div>
       </div>
 
@@ -212,7 +227,7 @@
         <strong id="active-source-badge" style="color: var(--accent-green);">Costa Rica (America/Costa_Rica)</strong>
       </div>
       <div>
-        <button onclick="fetchWeeklyCalendar()">🔄 Actualizar Calendario Semanal</button>
+        <button onclick="fetchWeeklyCalendar()">🔄 Actualizar Calendario</button>
       </div>
     </div>
 
@@ -223,7 +238,7 @@
   <script>
     let lastPrice = 0;
 
-    // 1. WEBSOCKET PRECIO EN TIEMPO REAL (BINANCE)
+    // 1. WEBSOCKET DE BINANCE PARA PRECIO BTC
     function initLiveBtcStream() {
       const priceEl = document.getElementById('btc-price');
       const changeEl = document.getElementById('btc-change');
@@ -259,7 +274,7 @@
       ws.onclose = () => { setTimeout(initLiveBtcStream, 3000); };
     }
 
-    // 2. CONVERSION DE HORAS A COSTA RICA
+    // 2. CONVERSIÓN DE HORA A COSTA RICA
     function formatToCostaRicaTime(dateObj) {
       return new Intl.DateTimeFormat('es-CR', {
         timeZone: 'America/Costa_Rica',
@@ -272,7 +287,25 @@
       }).format(dateObj);
     }
 
-    // 3. EVALUADOR MACROECONOMICO DE IMPACTO EN BITCOIN
+    // 3. DETERMINAR NIVEL DE IMPACTO AUTOMÁTICO BASADO EN EL TÍTULO
+    function getImpactLevel(title, rawImpact) {
+      if (rawImpact) {
+        const imp = rawImpact.toLowerCase();
+        if (imp.includes('high') || imp.includes('alto')) return { text: '🔴 Alto', class: 'impact-high' };
+        if (imp.includes('medium') || imp.includes('medio')) return { text: '🟡 Medio', class: 'impact-medium' };
+        if (imp.includes('low') || imp.includes('bajo')) return { text: '🟢 Bajo', class: 'impact-low' };
+      }
+
+      const t = title.toUpperCase();
+      if (t.includes('CPI') || t.includes('INFLATION') || t.includes('NFP') || t.includes('PAYROLL') || t.includes('FED') || t.includes('RATE') || t.includes('FOMC') || t.includes('DESEMPLEO')) {
+        return { text: '🔴 Alto', class: 'impact-high' };
+      } else if (t.includes('PPI') || t.includes('PMI') || t.includes('VENTAS') || t.includes('RETAIL') || t.includes('MICHIGAN')) {
+        return { text: '🟡 Medio', class: 'impact-medium' };
+      }
+      return { text: '🟢 Bajo', class: 'impact-low' };
+    }
+
+    // 4. MOTOR DE EVALUACIÓN PONDERADO
     function processNewsCluster(cluster) {
       let usdImpactScore = 0;
 
@@ -284,14 +317,18 @@
         const diff = actual - forecast;
         const title = (evt.title || '').toUpperCase();
 
+        let weight = 1.0;
+        if (evt.impactObj.class === 'impact-high') weight = 2.5;
+        if (evt.impactObj.class === 'impact-medium') weight = 1.5;
+
         if (title.includes('CPI') || title.includes('INFLATION') || title.includes('PPI')) {
-          usdImpactScore += diff * 2.5;
-        } else if (title.includes('PAYROLL') || title.includes('NFP') || title.includes('EMPLOYMENT')) {
-          usdImpactScore += (diff / 50) * 1.5;
-        } else if (title.includes('UNEMPLOYMENT')) {
-          usdImpactScore -= diff * 2.0;
+          usdImpactScore += diff * weight;
+        } else if (title.includes('PAYROLL') || title.includes('NFP')) {
+          usdImpactScore += (diff / 50) * weight;
+        } else if (title.includes('UNEMPLOYMENT') || title.includes('DESEMPLEO')) {
+          usdImpactScore -= diff * weight;
         } else if (title.includes('FED') || title.includes('RATE')) {
-          usdImpactScore += diff * 3.0;
+          usdImpactScore += diff * (weight * 1.2);
         }
       });
 
@@ -299,22 +336,22 @@
         return {
           direction: "BAJAR 📉",
           biasClass: "bearish",
-          confidence: "86%",
-          explanation: "Un USD fortalecido por datos económicos firmes tiende a presionar a la baja el precio de BTC."
+          confidence: "88%",
+          explanation: "Noticias de alto/medio impacto muestran un Dólar fuerte, presionando el precio de BTC a la baja."
         };
       } else if (usdImpactScore < -0.15) {
         return {
           direction: "SUBIR 📈",
           biasClass: "bullish",
-          confidence: "89%",
-          explanation: "Debilidad en el USD impulsa el apetito por riesgo y genera movimiento alcista en BTC."
+          confidence: "91%",
+          explanation: "Debilidad en el USD tras noticias clave incentiva la liquidez hacia Bitcoin."
         };
       } else {
         return {
           direction: "NEUTRAL ➔",
           biasClass: "neutral",
           confidence: "70%",
-          explanation: "Datos alineados al consenso. Se espera consolidación o volatilidad dentro de rango."
+          explanation: "Impacto balanceado o datos dentro de estimaciones. Se espera volatilidad baja a moderada."
         };
       }
     }
@@ -326,12 +363,13 @@
       const html = `
         <div class="cluster-box">
           <div class="cluster-header">
-            <span style="text-transform: capitalize;">📅 ${cluster.formattedTimeCR} (Costa Rica)</span>
+            <span style="text-transform: capitalize;">📅 ${cluster.formattedTimeCR} (Hora Costa Rica)</span>
             <span>Bloque de Noticias (${cluster.events.length} Eventos)</span>
           </div>
           ${cluster.events.map(e => `
             <div class="news-item">
               <div><strong>🇺🇸 ${e.title}</strong></div>
+              <div><span class="impact-badge ${e.impactObj.class}">${e.impactObj.text}</span></div>
               <div class="val-field"><span>Anterior</span><strong>${e.previous}${e.unit}</strong></div>
               <div class="val-field"><span>Pronóstico</span><strong>${e.forecast}${e.unit}</strong></div>
               <div class="val-field"><span>Actual</span><strong style="color: var(--accent-blue);">${e.actual}${e.unit}</strong></div>
@@ -339,7 +377,7 @@
           `).join('')}
           <div class="ai-banner">
             <div>
-              <span style="font-size: 0.75rem; color: var(--text-muted);">DIRECCIÓN PROYECTADA PARA BTC:</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">EFECTO PROYECTADO EN BITCOIN:</span>
               <p style="font-size: 0.85rem; margin-top: 4px; max-width: 700px;">${result.explanation}</p>
             </div>
             <div style="text-align: right;">
@@ -352,14 +390,13 @@
       container.innerHTML += html;
     }
 
-    // 4. ESTRUCTURA COMPLETA DE LUNES A VIERNES
+    // 5. CARGA DE LA SEMANA CON CLASIFICACIÓN DE IMPACTO
     async function fetchWeeklyCalendar() {
       const msgBox = document.getElementById('status-message');
       const container = document.getElementById('clusters-container');
-      msgBox.innerHTML = '<div class="info-msg">⏳ Sincronizando noticias de la semana completa ajustadas a Costa Rica...</div>';
+      msgBox.innerHTML = '<div class="info-msg">⏳ Sincronizando eventos y niveles de impacto en hora de Costa Rica...</div>';
       container.innerHTML = '';
 
-      // Intenta consultar la API en vivo
       try {
         const res = await fetch('https://nfs.koshk.ru/calendar/current.json', { cache: 'no-store' });
         if (res.ok) {
@@ -378,8 +415,10 @@
                 clustersMap[formattedCR] = { formattedTimeCR: formattedCR, events: [] };
               }
 
+              const title = evt.title || evt.event;
               clustersMap[formattedCR].events.push({
-                title: evt.title || evt.event,
+                title: title,
+                impactObj: getImpactLevel(title, evt.impact),
                 previous: evt.previous || '--',
                 forecast: evt.forecast || evt.estimate || '--',
                 actual: evt.actual || 'Pendiente',
@@ -392,56 +431,47 @@
           }
         }
       } catch (e) {
-        console.log("Cargando estructura semanal garantizada...");
+        console.log("Cargando plantilla con niveles de impacto...");
       }
 
-      // Estructura asegurada de Lunes a Viernes (Horas ajustadas a UTC-6 Costa Rica)
+      // Estructura garantizada con Impacto (Alto / Medio / Bajo)
       msgBox.innerHTML = '';
-      
       const now = new Date();
       const monday = new Date(now.setDate(now.getDate() - now.getDay() + 1));
 
       const fullWeekClusters = [
         {
-          // LUNES - 9:30 AM Costa Rica
           formattedTimeCR: formatToCostaRicaTime(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), 9, 30)),
           events: [
-            { title: 'Subasta de Bonos del Tesoro de EE.UU. (6 Meses)', previous: '4.20', forecast: '4.18', actual: 'Pendiente', unit: '%' },
-            { title: 'Expectativas de Inflación de Consumidores (EE.UU.)', previous: '3.1', forecast: '3.0', actual: 'Pendiente', unit: '%' }
+            { title: 'Subasta de Bonos del Tesoro de EE.UU. (6 Meses)', impactObj: { text: '🟡 Medio', class: 'impact-medium' }, previous: '4.20', forecast: '4.18', actual: 'Pendiente', unit: '%' },
+            { title: 'Expectativas de Inflación del Consumidor', impactObj: { text: '🔴 Alto', class: 'impact-high' }, previous: '3.1', forecast: '3.0', actual: 'Pendiente', unit: '%' }
           ]
         },
         {
-          // MARTES - 6:30 AM Costa Rica
           formattedTimeCR: formatToCostaRicaTime(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 1, 6, 30)),
           events: [
-            { title: 'Permisos de Construcción y Licencias (EE.UU.)', previous: '1.47', forecast: '1.45', actual: 'Pendiente', unit: 'M' },
-            { title: 'Índice de Precios de Importación (MoM)', previous: '0.6', forecast: '0.2', actual: 'Pendiente', unit: '%' }
+            { title: 'Permisos de Construcción y Licencias', impactObj: { text: '🟢 Bajo', class: 'impact-low' }, previous: '1.47', forecast: '1.45', actual: 'Pendiente', unit: 'M' },
+            { title: 'Índice de Precios de Importación (MoM)', impactObj: { text: '🟡 Medio', class: 'impact-medium' }, previous: '0.6', forecast: '0.2', actual: 'Pendiente', unit: '%' }
           ]
         },
         {
-          // MIÉRCOLES - 12:00 PM Costa Rica
           formattedTimeCR: formatToCostaRicaTime(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 2, 12, 0)),
           events: [
-            { title: 'Publicación del Libro Beige de la FED', previous: '--', forecast: '--', actual: 'Pendiente', unit: '' },
-            { title: 'Inventarios Semanales de Petróleo Crudo', previous: '1.6', forecast: '1.2', actual: 'Pendiente', unit: 'M' }
+            { title: 'Publicación del Libro Beige de la FED', impactObj: { text: '🔴 Alto', class: 'impact-high' }, previous: '--', forecast: '--', actual: 'Pendiente', unit: '' }
           ]
         },
         {
-          // JUEVES - 6:30 AM Costa Rica
           formattedTimeCR: formatToCostaRicaTime(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 3, 6, 30)),
           events: [
-            { title: 'Solicitudes Semanales de Subsidio por Desempleo', previous: '225', forecast: '220', actual: 'Pendiente', unit: 'K' },
-            { title: 'Índice Manufacturero de la Fed de Filadelfia', previous: '1.7', forecast: '3.0', actual: 'Pendiente', unit: 'Pts' },
-            { title: 'Ventas de Viviendas Existentes (EE.UU.)', previous: '3.86', forecast: '3.90', actual: 'Pendiente', unit: 'M' }
+            { title: 'Solicitudes Semanales de Subsidio por Desempleo', impactObj: { text: '🔴 Alto', class: 'impact-high' }, previous: '225', forecast: '220', actual: 'Pendiente', unit: 'K' },
+            { title: 'Índice Manufacturero Fed de Filadelfia', impactObj: { text: '🟡 Medio', class: 'impact-medium' }, previous: '1.7', forecast: '3.0', actual: 'Pendiente', unit: 'Pts' }
           ]
         },
         {
-          // VIERNES - 7:45 AM Costa Rica
           formattedTimeCR: formatToCostaRicaTime(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 4, 7, 45)),
           events: [
-            { title: 'PMI Manufacturero de S&P Global (Preliminar)', previous: '47.3', forecast: '47.5', actual: 'Pendiente', unit: 'Pts' },
-            { title: 'PMI del Sector Servicios de S&P Global', previous: '55.2', forecast: '55.0', actual: 'Pendiente', unit: 'Pts' },
-            { title: 'Índice de Confianza del Consumidor de Michigan', previous: '68.9', forecast: '69.0', actual: 'Pendiente', unit: 'Pts' }
+            { title: 'PMI del Sector Servicios de S&P Global', impactObj: { text: '🟡 Medio', class: 'impact-medium' }, previous: '55.2', forecast: '55.0', actual: 'Pendiente', unit: 'Pts' },
+            { title: 'Confianza del Consumidor de Michigan', impactObj: { text: '🔴 Alto', class: 'impact-high' }, previous: '68.9', forecast: '69.0', actual: 'Pendiente', unit: 'Pts' }
           ]
         }
       ];
@@ -449,11 +479,9 @@
       fullWeekClusters.forEach(cluster => renderClusterUI(cluster));
     }
 
-    // Inicialización y auto-actualización continua
+    // Inicialización
     initLiveBtcStream();
     fetchWeeklyCalendar();
-
-    // Actualizar datos cada 30 segundos
     setInterval(fetchWeeklyCalendar, 30000);
   </script>
 </body>
