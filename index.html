@@ -138,7 +138,6 @@
       gap: 8px;
     }
 
-    /* BADGES DE IMPACTO DE LA NOTICIA */
     .impact-badge {
       font-size: 0.7rem;
       font-weight: 700;
@@ -238,7 +237,6 @@
   <script>
     let lastPrice = 0;
 
-    // 1. WEBSOCKET DE BINANCE PARA PRECIO BTC
     function initLiveBtcStream() {
       const priceEl = document.getElementById('btc-price');
       const changeEl = document.getElementById('btc-change');
@@ -274,7 +272,6 @@
       ws.onclose = () => { setTimeout(initLiveBtcStream, 3000); };
     }
 
-    // 2. CONVERSIÓN DE HORA A COSTA RICA
     function formatToCostaRicaTime(dateObj) {
       return new Intl.DateTimeFormat('es-CR', {
         timeZone: 'America/Costa_Rica',
@@ -287,7 +284,6 @@
       }).format(dateObj);
     }
 
-    // 3. DETERMINAR NIVEL DE IMPACTO AUTOMÁTICO BASADO EN EL TÍTULO
     function getImpactLevel(title, rawImpact) {
       if (rawImpact) {
         const imp = rawImpact.toLowerCase();
@@ -305,7 +301,6 @@
       return { text: '🟢 Bajo', class: 'impact-low' };
     }
 
-    // 4. MOTOR DE EVALUACIÓN PONDERADO
     function processNewsCluster(cluster) {
       let usdImpactScore = 0;
 
@@ -322,13 +317,15 @@
         if (evt.impactObj.class === 'impact-medium') weight = 1.5;
 
         if (title.includes('CPI') || title.includes('INFLATION') || title.includes('PPI')) {
-          usdImpactScore += diff * weight;
+          usdImpactScore += diff * weight * 2.0;
         } else if (title.includes('PAYROLL') || title.includes('NFP')) {
-          usdImpactScore += (diff / 50) * weight;
+          usdImpactScore += (diff / 50.0) * weight;
         } else if (title.includes('UNEMPLOYMENT') || title.includes('DESEMPLEO')) {
-          usdImpactScore -= diff * weight;
+          usdImpactScore -= diff * weight * 2.0;
         } else if (title.includes('FED') || title.includes('RATE')) {
-          usdImpactScore += diff * (weight * 1.2);
+          usdImpactScore += diff * (weight * 1.5);
+        } else {
+          usdImpactScore += diff * weight * 0.1;
         }
       });
 
@@ -390,54 +387,11 @@
       container.innerHTML += html;
     }
 
-    // 5. CARGA DE LA SEMANA CON CLASIFICACIÓN DE IMPACTO
-    async function fetchWeeklyCalendar() {
+    function loadFallbackCalendar() {
       const msgBox = document.getElementById('status-message');
-      const container = document.getElementById('clusters-container');
-      msgBox.innerHTML = '<div class="info-msg">⏳ Sincronizando eventos y niveles de impacto en hora de Costa Rica...</div>';
-      container.innerHTML = '';
-
-      try {
-        const res = await fetch('https://nfs.koshk.ru/calendar/current.json', { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          const usdEvents = data.filter(e => (e.country === 'USD' || e.currency === 'USD'));
-
-          if (usdEvents.length >= 5) {
-            msgBox.innerHTML = '';
-            const clustersMap = {};
-
-            usdEvents.forEach(evt => {
-              const eventDate = evt.date ? new Date(evt.date) : new Date();
-              const formattedCR = formatToCostaRicaTime(eventDate);
-
-              if (!clustersMap[formattedCR]) {
-                clustersMap[formattedCR] = { formattedTimeCR: formattedCR, events: [] };
-              }
-
-              const title = evt.title || evt.event;
-              clustersMap[formattedCR].events.push({
-                title: title,
-                impactObj: getImpactLevel(title, evt.impact),
-                previous: evt.previous || '--',
-                forecast: evt.forecast || evt.estimate || '--',
-                actual: evt.actual || 'Pendiente',
-                unit: ''
-              });
-            });
-
-            Object.values(clustersMap).forEach(cluster => renderClusterUI(cluster));
-            return;
-          }
-        }
-      } catch (e) {
-        console.log("Cargando plantilla con niveles de impacto...");
-      }
-
-      // Estructura garantizada con Impacto (Alto / Medio / Bajo)
       msgBox.innerHTML = '';
       const now = new Date();
-      const monday = new Date(now.setDate(now.getDate() - now.getDay() + 1));
+      const monday = new Date(now.setDate(now.getDate() - (now.getDay() || 7) + 1));
 
       const fullWeekClusters = [
         {
@@ -479,10 +433,64 @@
       fullWeekClusters.forEach(cluster => renderClusterUI(cluster));
     }
 
+    async function fetchWeeklyCalendar() {
+      const msgBox = document.getElementById('status-message');
+      const container = document.getElementById('clusters-container');
+      msgBox.innerHTML = '<div class="info-msg">⏳ Sincronizando eventos y niveles de impacto en hora de Costa Rica...</div>';
+      container.innerHTML = '';
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        const res = await fetch('https://nfs.koshk.ru/calendar/current.json', { 
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const usdEvents = data.filter(e => (e.country === 'USD' || e.currency === 'USD'));
+
+          if (usdEvents.length >= 5) {
+            msgBox.innerHTML = '';
+            const clustersMap = {};
+
+            usdEvents.forEach(evt => {
+              const eventDate = evt.date ? new Date(evt.date) : new Date();
+              const formattedCR = formatToCostaRicaTime(eventDate);
+
+              if (!clustersMap[formattedCR]) {
+                clustersMap[formattedCR] = { formattedTimeCR: formattedCR, events: [] };
+              }
+
+              const title = evt.title || evt.event;
+              clustersMap[formattedCR].events.push({
+                title: title,
+                impactObj: getImpactLevel(title, evt.impact),
+                previous: evt.previous || '--',
+                forecast: evt.forecast || evt.estimate || '--',
+                actual: evt.actual || 'Pendiente',
+                unit: ''
+              });
+            });
+
+            Object.values(clustersMap).forEach(cluster => renderClusterUI(cluster));
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("API externa no disponible o tiempo agotado. Utilizando plantilla predeterminada.");
+      }
+
+      loadFallbackCalendar();
+    }
+
     // Inicialización
     initLiveBtcStream();
     fetchWeeklyCalendar();
-    setInterval(fetchWeeklyCalendar, 30000);
+    setInterval(fetchWeeklyCalendar, 60000);
   </script>
 </body>
 </html>
