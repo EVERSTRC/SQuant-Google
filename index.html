@@ -235,6 +235,7 @@
   </div>
 
   <script>
+    const FMP_API_KEY = 'exL5USAvIGPpWF1HKYN6cL2pPU5Z550g';
     let lastPrice = 0;
 
     // 1. WEBSOCKET DE BINANCE PARA PRECIO BTC
@@ -286,10 +287,10 @@
       }).format(dateObj);
     }
 
-    // 3. DETERMINAR NIVEL DE IMPACTO AUTOMÁTICO BASADO EN EL TÍTULO
-    function getImpactLevel(title, rawImpact) {
-      if (rawImpact) {
-        const imp = rawImpact.toLowerCase();
+    // 3. DETERMINAR NIVEL DE IMPACTO AUTOMÁTICO BASADO EN EL TÍTULO O IMPACTO DE FMP
+    function getImpactLevel(title, impactStr) {
+      if (impactStr) {
+        const imp = impactStr.toLowerCase();
         if (imp.includes('high') || imp.includes('alto')) return { text: '🔴 Alto', class: 'impact-high' };
         if (imp.includes('medium') || imp.includes('medio')) return { text: '🟡 Medio', class: 'impact-medium' };
         if (imp.includes('low') || imp.includes('bajo')) return { text: '🟢 Bajo', class: 'impact-low' };
@@ -368,12 +369,9 @@
             <span>Bloque de Noticias (${cluster.events.length} Eventos)</span>
           </div>
           ${cluster.events.map(e => {
-            // Limpieza de prefijo "us " del título
             const cleanTitle = e.title.replace(/^us\s+/i, '');
-
-            // Formato condicional de unidad para no concatenar en "Pendiente"
             const formatVal = (val, unit) => {
-              if (val === 'Pendiente' || val === '--' || val === undefined) return val || '--';
+              if (val === 'Pendiente' || val === '--' || val === undefined || val === null || val === '') return 'Pendiente';
               return `${val}${unit || ''}`;
             };
 
@@ -448,31 +446,23 @@
       fullWeekClusters.forEach(cluster => renderClusterUI(cluster));
     }
 
-    // 5. CARGA CON PROXY CORS Y DETECCIÓN DE TIMEOUT
+    // 5. CARGA DE CALENDARIO DESDE FMP API
     async function fetchWeeklyCalendar() {
       const msgBox = document.getElementById('status-message');
       const container = document.getElementById('clusters-container');
-      msgBox.innerHTML = '<div class="info-msg">⏳ Sincronizando eventos y niveles de impacto en hora de Costa Rica...</div>';
+      msgBox.innerHTML = '<div class="info-msg">⏳ Sincronizando eventos y datos actuales vía Financial Modeling Prep (FMP)...</div>';
       container.innerHTML = '';
 
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const targetUrl = 'https://nfs.koshk.ru/calendar/current.json';
-        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
-
-        const res = await fetch(proxyUrl, {
-          cache: 'no-store',
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+        const url = `https://financialmodelingprep.com/api/v3/economic_calendar?apikey=${FMP_API_KEY}`;
+        const res = await fetch(url, { cache: 'no-store' });
 
         if (res.ok) {
           const data = await res.json();
-          const usdEvents = data.filter(e => (e.country === 'USD' || e.currency === 'USD'));
+          // Filtrar eventos correspondientes a Estados Unidos
+          const usdEvents = data.filter(e => e.country === 'US');
 
-          if (usdEvents.length >= 3) {
+          if (usdEvents && usdEvents.length > 0) {
             msgBox.innerHTML = '';
             const clustersMap = {};
 
@@ -484,13 +474,13 @@
                 clustersMap[formattedCR] = { formattedTimeCR: formattedCR, events: [] };
               }
 
-              const rawTitle = evt.title || evt.event || '';
+              const title = evt.event || 'Evento Económico';
               clustersMap[formattedCR].events.push({
-                title: rawTitle,
-                impactObj: getImpactLevel(rawTitle, evt.impact),
-                previous: evt.previous || '--',
-                forecast: evt.forecast || evt.estimate || '--',
-                actual: evt.actual || 'Pendiente',
+                title: title,
+                impactObj: getImpactLevel(title, evt.impact),
+                previous: evt.previous !== null ? evt.previous : '--',
+                forecast: evt.estimate !== null ? evt.estimate : '--',
+                actual: evt.actual !== null && evt.actual !== undefined ? evt.actual : 'Pendiente',
                 unit: ''
               });
             });
@@ -500,7 +490,7 @@
           }
         }
       } catch (e) {
-        console.warn("No se pudo conectar a la API en vivo o expiró el tiempo de espera. Cargando interfaz predeterminada.", e);
+        console.warn("Error al conectar con FMP. Activando plantilla de respaldo.", e);
       }
 
       loadFallbackCalendar();
