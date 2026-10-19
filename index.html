@@ -237,6 +237,7 @@
   <script>
     let lastPrice = 0;
 
+    // 1. WEBSOCKET DE BINANCE PARA PRECIO BTC
     function initLiveBtcStream() {
       const priceEl = document.getElementById('btc-price');
       const changeEl = document.getElementById('btc-change');
@@ -272,6 +273,7 @@
       ws.onclose = () => { setTimeout(initLiveBtcStream, 3000); };
     }
 
+    // 2. CONVERSIÓN DE HORA A COSTA RICA
     function formatToCostaRicaTime(dateObj) {
       return new Intl.DateTimeFormat('es-CR', {
         timeZone: 'America/Costa_Rica',
@@ -284,6 +286,7 @@
       }).format(dateObj);
     }
 
+    // 3. DETERMINAR NIVEL DE IMPACTO AUTOMÁTICO BASADO EN EL TÍTULO
     function getImpactLevel(title, rawImpact) {
       if (rawImpact) {
         const imp = rawImpact.toLowerCase();
@@ -301,6 +304,7 @@
       return { text: '🟢 Bajo', class: 'impact-low' };
     }
 
+    // 4. MOTOR DE EVALUACIÓN PONDERADO
     function processNewsCluster(cluster) {
       let usdImpactScore = 0;
 
@@ -363,15 +367,26 @@
             <span style="text-transform: capitalize;">📅 ${cluster.formattedTimeCR} (Hora Costa Rica)</span>
             <span>Bloque de Noticias (${cluster.events.length} Eventos)</span>
           </div>
-          ${cluster.events.map(e => `
-            <div class="news-item">
-              <div><strong>🇺🇸 ${e.title}</strong></div>
-              <div><span class="impact-badge ${e.impactObj.class}">${e.impactObj.text}</span></div>
-              <div class="val-field"><span>Anterior</span><strong>${e.previous}${e.unit}</strong></div>
-              <div class="val-field"><span>Pronóstico</span><strong>${e.forecast}${e.unit}</strong></div>
-              <div class="val-field"><span>Actual</span><strong style="color: var(--accent-blue);">${e.actual}${e.unit}</strong></div>
-            </div>
-          `).join('')}
+          ${cluster.events.map(e => {
+            // Limpieza de prefijo "us " del título
+            const cleanTitle = e.title.replace(/^us\s+/i, '');
+
+            // Formato condicional de unidad para no concatenar en "Pendiente"
+            const formatVal = (val, unit) => {
+              if (val === 'Pendiente' || val === '--' || val === undefined) return val || '--';
+              return `${val}${unit || ''}`;
+            };
+
+            return `
+              <div class="news-item">
+                <div><strong>🇺🇸 ${cleanTitle}</strong></div>
+                <div><span class="impact-badge ${e.impactObj.class}">${e.impactObj.text}</span></div>
+                <div class="val-field"><span>Anterior</span><strong>${formatVal(e.previous, e.unit)}</strong></div>
+                <div class="val-field"><span>Pronóstico</span><strong>${formatVal(e.forecast, e.unit)}</strong></div>
+                <div class="val-field"><span>Actual</span><strong style="color: var(--accent-blue);">${formatVal(e.actual, e.unit)}</strong></div>
+              </div>
+            `;
+          }).join('')}
           <div class="ai-banner">
             <div>
               <span style="font-size: 0.75rem; color: var(--text-muted);">EFECTO PROYECTADO EN BITCOIN:</span>
@@ -433,6 +448,7 @@
       fullWeekClusters.forEach(cluster => renderClusterUI(cluster));
     }
 
+    // 5. CARGA CON PROXY CORS Y DETECCIÓN DE TIMEOUT
     async function fetchWeeklyCalendar() {
       const msgBox = document.getElementById('status-message');
       const container = document.getElementById('clusters-container');
@@ -441,9 +457,12 @@
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const res = await fetch('https://nfs.koshk.ru/calendar/current.json', { 
+        const targetUrl = 'https://nfs.koshk.ru/calendar/current.json';
+        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+
+        const res = await fetch(proxyUrl, {
           cache: 'no-store',
           signal: controller.signal
         });
@@ -453,7 +472,7 @@
           const data = await res.json();
           const usdEvents = data.filter(e => (e.country === 'USD' || e.currency === 'USD'));
 
-          if (usdEvents.length >= 5) {
+          if (usdEvents.length >= 3) {
             msgBox.innerHTML = '';
             const clustersMap = {};
 
@@ -465,10 +484,10 @@
                 clustersMap[formattedCR] = { formattedTimeCR: formattedCR, events: [] };
               }
 
-              const title = evt.title || evt.event;
+              const rawTitle = evt.title || evt.event || '';
               clustersMap[formattedCR].events.push({
-                title: title,
-                impactObj: getImpactLevel(title, evt.impact),
+                title: rawTitle,
+                impactObj: getImpactLevel(rawTitle, evt.impact),
                 previous: evt.previous || '--',
                 forecast: evt.forecast || evt.estimate || '--',
                 actual: evt.actual || 'Pendiente',
@@ -481,7 +500,7 @@
           }
         }
       } catch (e) {
-        console.warn("API externa no disponible o tiempo agotado. Utilizando plantilla predeterminada.");
+        console.warn("No se pudo conectar a la API en vivo o expiró el tiempo de espera. Cargando interfaz predeterminada.", e);
       }
 
       loadFallbackCalendar();
